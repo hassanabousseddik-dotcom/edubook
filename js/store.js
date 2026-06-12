@@ -20,28 +20,54 @@ class EduBookStore {
   async initialize() {
     // Récupère le profil de l'utilisateur connecté
     const { data: { user } } = await supabase.auth.getUser();
+    console.log("EduBook Auth User:", user);
+    
     if (user) {
       let { data: profile } = await supabase
         .from('profiles').select('*').eq('id', user.id).maybeSingle();
       
-      // Si le profil n'existe pas (ex: créé dans Auth avant le trigger SQL), on le crée à la volée
+      // Si aucun profil n'existe, on le crée automatiquement
       if (!profile) {
-        const email = user.email;
-        const name = email.split('@')[0];
-        const role = email.includes('admin') ? 'admin' : 'teacher';
-        const avatar = name.substring(0, 2).toUpperCase();
+        const fallbackName =
+          user.user_metadata?.name ||
+          user.user_metadata?.full_name ||
+          user.email?.split("@")[0] ||
+          "Utilisateur";
+
+        const defaultProfile = {
+          id: user.id,
+          name: fallbackName,
+          email: user.email || "",
+          avatar: fallbackName.charAt(0).toUpperCase(),
+          role: user.email?.includes("admin") ? "admin" : "teacher"
+        };
 
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
-          .insert({ id: user.id, email, name, role, avatar })
+          .insert(defaultProfile)
           .select()
           .maybeSingle();
 
         if (!insertError && newProfile) {
           profile = newProfile;
+        } else {
+          profile = defaultProfile; // Garde-fou local en cas d'erreur insertion
         }
       }
-      this.state.currentUser = profile;
+
+      // Garantir que currentUser ne contient aucun champ critique undefined
+      this.state.currentUser = {
+        id: profile.id || user.id,
+        name: profile.name || user.email?.split("@")[0] || "Utilisateur",
+        email: profile.email || user.email || "",
+        avatar: profile.avatar || "U",
+        role: profile.role || (user.email?.includes("admin") ? "admin" : "teacher")
+      };
+
+      console.log("EduBook Profile:", this.state.currentUser);
+    } else {
+      this.state.currentUser = null;
+      console.log("EduBook Profile: Aucun utilisateur connecté.");
     }
 
     await this.refreshAll();
@@ -83,11 +109,14 @@ class EduBookStore {
   }
 
   mapActivity(act) {
+    if (!act) return null;
     return {
-      ...act,
-      userName: act.user_name,
-      itemName: act.item_name,
-      time: formatRelativeTime(act.created_at)
+      id: act.id,
+      userName: act.user_name || act.userName || "Utilisateur",
+      action: act.action || "a effectué une action sur",
+      itemName: act.item_name || act.itemName || "un matériel",
+      createdAt: act.created_at || new Date().toISOString(),
+      time: formatRelativeTime(act.created_at || new Date().toISOString())
     };
   }
 

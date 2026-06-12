@@ -1,6 +1,7 @@
 // EduBook Navbar Component — avec déconnexion Supabase
 import store from '../store.js';
 import { signOut } from '../auth.js';
+import { getSafeAvatar, getSafeUserName } from '../utils/safeText.js';
 
 export function renderNavbar() {
   const container = document.getElementById('navbar');
@@ -8,7 +9,8 @@ export function renderNavbar() {
 
   const currentUser = store.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
-  const avatarText = currentUser?.avatar || currentUser?.name?.substring(0, 2).toUpperCase() || 'US';
+  const displayName = getSafeUserName(currentUser);
+  const avatarText = getSafeAvatar(currentUser);
 
   container.innerHTML = `
     <nav class="navbar">
@@ -56,7 +58,7 @@ export function renderNavbar() {
             <div class="activity-avatar" style="width:28px;height:28px;font-size:0.75rem;background:var(--primary);color:white;">
               ${avatarText}
             </div>
-            <span>${currentUser?.name || 'Utilisateur'}</span>
+            <span>${displayName}</span>
             <span class="user-badge ${isAdmin ? 'admin' : 'teacher'}">
               ${isAdmin ? 'Admin' : 'Prof'}
             </span>
@@ -66,8 +68,8 @@ export function renderNavbar() {
             <div class="user-dropdown-menu glass-card" id="user-dropdown"
               style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;z-index:1001;padding:12px;flex-direction:column;gap:8px;">
               <div style="padding:8px 4px;border-bottom:1px solid var(--border-color);margin-bottom:4px;">
-                <p style="font-size:0.8rem;font-weight:600;color:var(--text-main);">${currentUser?.name}</p>
-                <p style="font-size:0.72rem;color:var(--text-muted);">${currentUser?.email || ''}</p>
+                <p style="font-size:0.8rem;font-weight:600;color:var(--text-main);">${displayName}</p>
+                <p style="font-size:0.72rem;color:var(--text-muted);">${currentUser?.email || 'Non renseigné'}</p>
               </div>
               <a href="#profile" class="dropdown-item" id="dropdown-profile"
                 style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--radius-sm);cursor:pointer;text-decoration:none;color:var(--text-main);">

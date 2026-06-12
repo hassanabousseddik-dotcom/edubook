@@ -1,11 +1,18 @@
 // EduBook Dashboard Component
 import store from '../store.js';
+import { getSafeInitial } from '../utils/safeText.js';
 
 export function renderDashboard(container) {
-  const equipment = store.getEquipment();
-  const reservations = store.getReservations();
-  const activities = store.getActivities();
-  const currentUser = store.getCurrentUser();
+  const equipment = store.getEquipment() || [];
+  const reservations = store.getReservations() || [];
+  const activities = store.getActivities() || [];
+  const currentUser = store.getCurrentUser() || {
+    id: '',
+    name: 'Utilisateur',
+    email: '',
+    avatar: 'U',
+    role: 'teacher'
+  };
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -197,8 +204,9 @@ export function renderDashboard(container) {
         </h3>
         <div class="recent-activity-list">
           ${activities.slice(0, 4).map(activity => {
+            if (!activity) return '';
             const userName = activity.userName || 'Système';
-            let avatarLetter = userName.charAt(0) || 'S';
+            let avatarLetter = getSafeInitial(userName, 'S');
             if (userName.startsWith("Mme.")) avatarLetter = "M";
             if (userName.startsWith("M.")) avatarLetter = "M";
             if (userName === "Admin") avatarLetter = "A";
@@ -211,10 +219,10 @@ export function renderDashboard(container) {
                 <div class="activity-details">
                   <div class="activity-text">
                     <strong style="color: var(--text-main); font-weight: 600;">${userName}</strong> 
-                    <span style="color: var(--text-muted);">${activity.action}</span> 
-                    <span style="color: var(--primary); font-weight: 500;">${activity.itemName || ''}</span>
+                    <span style="color: var(--text-muted);">${activity.action || 'a effectué une action'}</span> 
+                    <span style="color: var(--primary); font-weight: 500;">${activity.itemName || 'un matériel'}</span>
                   </div>
-                  <div class="activity-time">${activity.time}</div>
+                  <div class="activity-time">${activity.time || '—'}</div>
                 </div>
               </div>
             `;

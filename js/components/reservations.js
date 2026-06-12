@@ -4,10 +4,13 @@ import toast from '../utils/toast.js';
 
 export function renderReservations(container) {
   const currentUser = store.getCurrentUser();
-  let reservations = store.getReservations().filter(res =>
-    res.userId === currentUser?.id || res.user_id === currentUser?.id
-  );
-  const equipmentList = store.getEquipment();
+  let reservations = [];
+  if (currentUser?.id) {
+    reservations = (store.getReservations() || []).filter(res =>
+      res.userId === currentUser.id || res.user_id === currentUser.id
+    );
+  }
+  const equipmentList = store.getEquipment() || [];
   let activeFilter = 'All';
 
   function getStatusBadge(status) {
@@ -115,7 +118,9 @@ export function renderReservations(container) {
           try {
             await store.updateReservationStatus(resId, 'cancelled');
             toast.success('Réservation annulée avec succès.');
-            reservations = store.getReservations().filter(res => res.userId === currentUser?.id || res.user_id === currentUser?.id);
+            reservations = (store.getReservations() || []).filter(res =>
+              currentUser?.id && (res.userId === currentUser.id || res.user_id === currentUser.id)
+            );
             filterAndRenderTable();
           } catch (err) { toast.error(err.message); btn.disabled = false; }
         }
@@ -130,7 +135,9 @@ export function renderReservations(container) {
         try {
           await store.prolongReservation(resId);
           toast.info('Demande de prolongation envoyée aux administrateurs.');
-          reservations = store.getReservations().filter(res => res.userId === currentUser?.id || res.user_id === currentUser?.id);
+          reservations = (store.getReservations() || []).filter(res =>
+            currentUser?.id && (res.userId === currentUser.id || res.user_id === currentUser.id)
+          );
           filterAndRenderTable();
         } catch (err) { toast.error(err.message); btn.disabled = false; }
       });

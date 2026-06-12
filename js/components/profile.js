@@ -3,9 +3,16 @@ import store from '../store.js';
 import { signOut } from '../auth.js';
 
 export function renderProfile(container) {
-  const currentUser = store.getCurrentUser();
-  const allUsers = store.getUsers();
-  const reservations = store.getReservations().filter(res => res.userId === currentUser.id);
+  const rawUser = store.getCurrentUser();
+  const currentUser = {
+    id: rawUser?.id || '',
+    name: rawUser?.name || 'Utilisateur',
+    email: rawUser?.email || 'Non renseigné',
+    avatar: rawUser?.avatar || 'U',
+    role: rawUser?.role || 'teacher'
+  };
+  const allUsers = store.getUsers() || [];
+  const reservations = (store.getReservations() || []).filter(res => res.userId === currentUser.id);
 
   // Stats
   const totalBookings = reservations.length;
