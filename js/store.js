@@ -21,8 +21,26 @@ class EduBookStore {
     // Récupère le profil de l'utilisateur connecté
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: profile } = await supabase
-        .from('profiles').select('*').eq('id', user.id).single();
+      let { data: profile } = await supabase
+        .from('profiles').select('*').eq('id', user.id).maybeSingle();
+      
+      // Si le profil n'existe pas (ex: créé dans Auth avant le trigger SQL), on le crée à la volée
+      if (!profile) {
+        const email = user.email;
+        const name = email.split('@')[0];
+        const role = email.includes('admin') ? 'admin' : 'teacher';
+        const avatar = name.substring(0, 2).toUpperCase();
+
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({ id: user.id, email, name, role, avatar })
+          .select()
+          .maybeSingle();
+
+        if (!insertError && newProfile) {
+          profile = newProfile;
+        }
+      }
       this.state.currentUser = profile;
     }
 
