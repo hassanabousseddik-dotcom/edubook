@@ -1,102 +1,64 @@
 // EduBook SPA Router
 import store from './store.js';
 import toast from './utils/toast.js';
+import { renderDashboard }   from './components/dashboard.js';
+import { renderCatalog }     from './components/catalog.js';
+import { renderReservations } from './components/reservations.js';
+import { renderAdminPanel }  from './components/adminPanel.js';
+import { renderProfile }     from './components/profile.js';
 
-class EduBookRouter {
-  constructor() {
-    this.routes = {};
-    this.defaultRoute = '#dashboard';
-    
-    // Listen to hash changes
-    window.addEventListener('hashchange', () => this.handleRouting());
-  }
+export function initRouter() {
+  function handleRouting() {
+    const hash = window.location.hash || '#dashboard';
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
 
-  register(hash, renderFunction, requiresAdmin = false) {
-    this.routes[hash] = {
-      render: renderFunction,
-      requiresAdmin
-    };
-  }
+    // Ferme le menu mobile si ouvert
+    document.querySelector('.nav-links')?.classList.remove('mobile-open');
 
-  navigate(hash) {
-    window.location.hash = hash;
-  }
-
-  handleRouting() {
-    let hash = window.location.hash || this.defaultRoute;
-    
-    // Find matching route
-    let route = this.routes[hash];
-    
-    if (!route) {
-      // Fallback if route does not exist
-      this.navigate(this.defaultRoute);
-      return;
-    }
-
-    // Role check for admin routes
-    if (route.requiresAdmin) {
+    // Protection route admin
+    if (hash === '#admin') {
       const user = store.getCurrentUser();
       if (!user || user.role !== 'admin') {
-        toast.warning("Accès refusé. Vous devez être administrateur pour accéder à cette page.");
-        this.navigate(this.defaultRoute);
+        toast.warning('Accès refusé. Réservé aux administrateurs.');
+        window.location.hash = '#dashboard';
         return;
       }
     }
 
-    // Hide mobile menu if open
-    const navLinks = document.querySelector('.nav-links');
-    if (navLinks) {
-      navLinks.classList.remove('mobile-open');
-    }
-
-    // Update active nav links
-    this.updateActiveNavLink(hash);
-
-    // Call render function
-    const mainContent = document.getElementById('main-content');
-    if (mainContent) {
-      // Clear main content
-      mainContent.innerHTML = '';
-      
-      // Render components
-      try {
-        route.render(mainContent);
-        // Re-trigger Lucide icons parsing to render newly injected elements
-        if (window.lucide) {
-          window.lucide.createIcons();
-        }
-      } catch (error) {
-        console.error("Routing error for " + hash, error);
-        mainContent.innerHTML = `
-          <div class="glass-card" style="text-align: center; padding: 40px;">
-            <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: var(--danger); margin-bottom: 16px;"></i>
-            <h2>Erreur lors du chargement de la page</h2>
-            <p style="color: var(--text-muted); margin-top: 10px;">${error.message}</p>
-            <button class="btn btn-primary" style="margin-top: 20px;" onclick="window.location.hash='#dashboard'">Retour au Tableau de Bord</button>
-          </div>
-        `;
-        if (window.lucide) window.lucide.createIcons();
-      }
-    }
-  }
-
-  updateActiveNavLink(activeHash) {
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-      const href = link.getAttribute('href');
-      if (href === activeHash) {
-        link.classList.add('active');
-      } else {
-        link.classList.remove('active');
-      }
+    // Active link highlight
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.classList.toggle('active', link.getAttribute('href') === hash);
     });
+
+    mainContent.innerHTML = '';
+    try {
+      switch (hash) {
+        case '#dashboard':    renderDashboard(mainContent);    break;
+        case '#catalog':      renderCatalog(mainContent);      break;
+        case '#reservations': renderReservations(mainContent); break;
+        case '#admin':        renderAdminPanel(mainContent);   break;
+        case '#profile':      renderProfile(mainContent);      break;
+        default:
+          window.location.hash = '#dashboard';
+          return;
+      }
+      if (window.lucide) window.lucide.createIcons();
+    } catch (err) {
+      console.error('Routing error:', err);
+      mainContent.innerHTML = `
+        <div class="glass-card" style="text-align:center;padding:40px;">
+          <i data-lucide="alert-triangle" style="width:48px;height:48px;color:var(--danger);margin-bottom:16px;"></i>
+          <h2>Erreur lors du chargement</h2>
+          <p style="color:var(--text-muted);margin-top:10px;">${err.message}</p>
+          <button class="btn btn-primary" style="margin-top:20px;"
+            onclick="window.location.hash='#dashboard'">Retour au Tableau de Bord</button>
+        </div>
+      `;
+      if (window.lucide) window.lucide.createIcons();
+    }
   }
 
-  init() {
-    this.handleRouting();
-  }
+  window.addEventListener('hashchange', handleRouting);
+  handleRouting(); // Route initiale
 }
-
-const router = new EduBookRouter();
-export default router;

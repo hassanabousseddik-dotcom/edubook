@@ -1,16 +1,9 @@
-// EduBook Global Store & LocalStorage Persistence
-import { initialEquipment, initialReservations, initialUsers, initialActivities } from './mockData.js';
+// EduBook — Global Store (Supabase-backed)
+import { supabase } from './supabase.js';
+import { formatRelativeTime } from './utils/time.js';
 
 class EduBookStore {
   constructor() {
-    this.storageKeys = {
-      equipment: 'edubook_equipment',
-      reservations: 'edubook_reservations',
-      users: 'edubook_users',
-      currentUser: 'edubook_current_user',
-      activities: 'edubook_activities'
-    };
-
     this.state = {
       equipment: [],
       reservations: [],
@@ -18,301 +11,234 @@ class EduBookStore {
       currentUser: null,
       activities: []
     };
-
     this.listeners = [];
-    this.init();
   }
 
-  init() {
-    // Load or initialize equipment
-    this.state.equipment = this.getOrSet(this.storageKeys.equipment, initialEquipment);
-    // Load or initialize reservations
-    this.state.reservations = this.getOrSet(this.storageKeys.reservations, initialReservations);
-    // Load or initialize users
-    this.state.users = this.getOrSet(this.storageKeys.users, initialUsers);
-    // Load or initialize activities
-    this.state.activities = this.getOrSet(this.storageKeys.activities, initialActivities);
-    
-    // Load current user (default to M. Martin - Teacher if not set)
-    const savedUser = localStorage.getItem(this.storageKeys.currentUser);
-    if (savedUser) {
-      this.state.currentUser = JSON.parse(savedUser);
-    } else {
-      this.state.currentUser = this.state.users[0]; // M. Martin
-      this.saveCurrentUser();
+  // --------------------------------------------------------
+  // INIT — charge tout depuis Supabase
+  // --------------------------------------------------------
+  async initialize() {
+    // Récupère le profil de l'utilisateur connecté
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles').select('*').eq('id', user.id).single();
+      this.state.currentUser = profile;
     }
+
+    await this.refreshAll();
+    this.subscribeRealtime();
   }
 
-  getOrSet(key, defaultValue) {
-    const data = localStorage.getItem(key);
-    if (data) {
-      try {
-        return JSON.parse(data);
-      } catch (e) {
-        console.error("Error parsing storage key: " + key, e);
-      }
-    }
-    localStorage.setItem(key, JSON.stringify(defaultValue));
-    return defaultValue;
+  async refreshAll() {
+    const [eq, res, profiles, acts] = await Promise.all([
+      supabase.from('equipment').select('*').order('created_at'),
+      supabase.from('reservations').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('*'),
+      supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(15)
+    ]);
+
+    this.state.equipment    = (eq.data    || []).map(this.mapEquipment);
+    this.state.reservations = (res.data   || []).map(this.mapReservation);
+    this.state.users        = profiles.data || [];
+    this.state.activities   = (acts.data  || []).map(this.mapActivity);
+    this.notify();
   }
 
-  // --- State Listeners ---
+  // Convertit snake_case → camelCase pour les composants existants
+  mapEquipment(item) {
+    return { ...item, imageUrl: item.image_url };
+  }
+
+  mapReservation(res) {
+    return {
+      ...res,
+      equipmentId:           res.equipment_id,
+      userId:                res.user_id,
+      userName:              res.user_name,
+      startDate:             res.start_date,
+      endDate:               res.end_date,
+      timeSlot:              res.time_slot,
+      prolongationRequested: res.prolongation_requested,
+      requestDate:           res.request_date
+    };
+  }
+
+  mapActivity(act) {
+    return { ...act, time: formatRelativeTime(act.created_at) };
+  }
+
+  // --------------------------------------------------------
+  // REALTIME — mises à jour automatiques en temps réel
+  // --------------------------------------------------------
+  subscribeRealtime() {
+    supabase.channel('edubook-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipment' },    () => this.refreshAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => this.refreshAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' },   () => this.refreshAll())
+      .subscribe();
+  }
+
+  // --------------------------------------------------------
+  // LISTENERS
+  // --------------------------------------------------------
   subscribe(listener) {
     this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
-    };
+    return () => { this.listeners = this.listeners.filter(l => l !== listener); };
   }
 
-  notify() {
-    this.listeners.forEach(listener => listener(this.state));
+  notify() { this.listeners.forEach(l => l(this.state)); }
+
+  // --------------------------------------------------------
+  // GETTERS (synchrones — depuis le cache local)
+  // --------------------------------------------------------
+  getEquipment()    { return this.state.equipment; }
+  getReservations() { return this.state.reservations; }
+  getUsers()        { return this.state.users; }
+  getCurrentUser()  { return this.state.currentUser; }
+  getActivities()   { return this.state.activities; }
+
+  // --------------------------------------------------------
+  // EQUIPMENT — CRUD async
+  // --------------------------------------------------------
+  async addEquipment(item) {
+    const { data, error } = await supabase.from('equipment').insert({
+      name: item.name, category: item.category, ref: item.ref,
+      description: item.description, status: item.status || 'available',
+      image_url: item.imageUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=500&auto=format&fit=crop&q=60'
+    }).select().single();
+    if (error) throw error;
+    await this.addActivity('a ajouté le matériel', data.name);
+    await this.refreshAll();
+    return data;
   }
 
-  // --- Save helpers ---
-  saveEquipment() {
-    localStorage.setItem(this.storageKeys.equipment, JSON.stringify(this.state.equipment));
-    this.notify();
-  }
+  async updateEquipment(itemId, fields) {
+    const dbFields = {};
+    if (fields.name)        dbFields.name        = fields.name;
+    if (fields.category)    dbFields.category    = fields.category;
+    if (fields.ref)         dbFields.ref         = fields.ref;
+    if (fields.description) dbFields.description = fields.description;
+    if (fields.status)      dbFields.status      = fields.status;
+    if (fields.imageUrl)    dbFields.image_url   = fields.imageUrl;
 
-  saveReservations() {
-    localStorage.setItem(this.storageKeys.reservations, JSON.stringify(this.state.reservations));
-    this.notify();
-  }
-
-  saveCurrentUser() {
-    localStorage.setItem(this.storageKeys.currentUser, JSON.stringify(this.state.currentUser));
-    this.notify();
-  }
-
-  saveActivities() {
-    localStorage.setItem(this.storageKeys.activities, JSON.stringify(this.state.activities));
-    this.notify();
-  }
-
-  // --- Current User management ---
-  setCurrentUser(userId) {
-    const user = this.state.users.find(u => u.id === userId);
-    if (user) {
-      this.state.currentUser = user;
-      this.saveCurrentUser();
-      this.addActivity("Utilisateur connecté en tant que", user.name);
-    }
-  }
-
-  getCurrentUser() {
-    return this.state.currentUser;
-  }
-
-  getUsers() {
-    return this.state.users;
-  }
-
-  // --- Equipment Actions ---
-  getEquipment() {
-    return this.state.equipment;
-  }
-
-  addEquipment(item) {
-    const newId = `eq-${Date.now()}`;
-    const newItem = {
-      ...item,
-      id: newId,
-      status: item.status || 'available',
-      imageUrl: item.imageUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=500&auto=format&fit=crop&q=60'
-    };
-    this.state.equipment.unshift(newItem);
-    this.saveEquipment();
-    this.addActivity("a ajouté le matériel", newItem.name);
-    return newItem;
-  }
-
-  updateEquipment(itemId, updatedFields) {
-    this.state.equipment = this.state.equipment.map(item => {
-      if (item.id === itemId) {
-        const updated = { ...item, ...updatedFields };
-        this.addActivity("a mis à jour le matériel", updated.name);
-        return updated;
-      }
-      return item;
-    });
-    this.saveEquipment();
-  }
-
-  deleteEquipment(itemId) {
+    const { error } = await supabase.from('equipment').update(dbFields).eq('id', itemId);
+    if (error) throw error;
     const item = this.state.equipment.find(eq => eq.id === itemId);
-    if (item) {
-      this.state.equipment = this.state.equipment.filter(eq => eq.id !== itemId);
-      this.saveEquipment();
-      
-      // Also cancel active/pending reservations for this item
-      this.state.reservations = this.state.reservations.map(res => {
-        if (res.equipmentId === itemId && (res.status === 'pending' || res.status === 'approved')) {
-          return { ...res, status: 'cancelled' };
-        }
-        return res;
-      });
-      this.saveReservations();
-      
-      this.addActivity("a supprimé le matériel", item.name);
-    }
+    await this.addActivity('a mis à jour le matériel', item?.name || '');
+    await this.refreshAll();
   }
 
-  // --- Reservations Actions ---
-  getReservations() {
-    return this.state.reservations;
+  async deleteEquipment(itemId) {
+    const item = this.state.equipment.find(eq => eq.id === itemId);
+    await supabase.from('reservations')
+      .update({ status: 'cancelled' })
+      .eq('equipment_id', itemId)
+      .in('status', ['pending', 'approved']);
+    const { error } = await supabase.from('equipment').delete().eq('id', itemId);
+    if (error) throw error;
+    if (item) await this.addActivity('a supprimé le matériel', item.name);
+    await this.refreshAll();
   }
 
-  // Check if a slot conflicts with an existing approved/pending reservation
-  checkConflict(equipmentId, startDate, endDate, timeSlot, excludeReservationId = null) {
+  // --------------------------------------------------------
+  // RESERVATIONS
+  // --------------------------------------------------------
+  checkConflict(equipmentId, startDate, endDate, timeSlot, excludeId = null) {
     return this.state.reservations.some(res => {
       if (res.equipmentId !== equipmentId) return false;
-      if (res.id === excludeReservationId) return false;
+      if (res.id === excludeId) return false;
       if (res.status !== 'approved' && res.status !== 'pending') return false;
-
-      // Simple date overlap check
-      const dStart = new Date(startDate);
-      const dEnd = new Date(endDate);
-      const resStart = new Date(res.startDate);
-      const resEnd = new Date(res.endDate);
-
-      const overlapDate = dStart <= resEnd && dEnd >= resStart;
-      
-      // If dates overlap, check if timeSlot is the same
-      if (overlapDate) {
-        return res.timeSlot === timeSlot;
-      }
-      return false;
+      const overlap = new Date(startDate) <= new Date(res.endDate) &&
+                      new Date(endDate)   >= new Date(res.startDate);
+      return overlap && res.timeSlot === timeSlot;
     });
   }
 
-  createReservation(bookingData) {
-    const { equipmentId, startDate, endDate, timeSlot, purpose } = bookingData;
-    
-    // Check conflicts
-    const conflict = this.checkConflict(equipmentId, startDate, endDate, timeSlot);
-    if (conflict) {
-      throw new Error("Ce matériel est déjà réservé pour ces dates et créneaux horaires.");
-    }
+  async createReservation({ equipmentId, startDate, endDate, timeSlot, purpose }) {
+    if (this.checkConflict(equipmentId, startDate, endDate, timeSlot))
+      throw new Error('Ce matériel est déjà réservé pour ces dates et créneaux horaires.');
 
     const item = this.state.equipment.find(eq => eq.id === equipmentId);
-    if (!item) throw new Error("Matériel introuvable.");
-    if (item.status === 'outoforder') throw new Error("Ce matériel est hors service.");
+    if (!item) throw new Error('Matériel introuvable.');
+    if (item.status === 'outoforder') throw new Error('Ce matériel est hors service.');
 
-    const newRes = {
-      id: `res-${Date.now()}`,
-      equipmentId,
-      userId: this.state.currentUser.id,
-      userName: this.state.currentUser.name,
-      startDate,
-      endDate,
-      timeSlot,
-      purpose,
-      status: this.state.currentUser.role === 'admin' ? 'approved' : 'pending',
-      requestDate: new Date().toISOString()
-    };
+    const status = this.state.currentUser?.role === 'admin' ? 'approved' : 'pending';
 
-    this.state.reservations.unshift(newRes);
-    this.saveReservations();
+    const { data, error } = await supabase.from('reservations').insert({
+      equipment_id: equipmentId,
+      user_id:      this.state.currentUser?.id,
+      user_name:    this.state.currentUser?.name || 'Inconnu',
+      start_date: startDate, end_date: endDate, time_slot: timeSlot,
+      purpose, status
+    }).select().single();
 
-    // If approved immediately (by admin), mark item as reserved
-    if (newRes.status === 'approved') {
-      this.updateEquipmentStatus(equipmentId);
-    }
-
-    this.addActivity("a demandé la réservation de", item.name);
-    return newRes;
+    if (error) throw error;
+    if (status === 'approved') await this.syncEquipmentStatus(equipmentId);
+    await this.addActivity('a demandé la réservation de', item.name);
+    await this.refreshAll();
+    return data;
   }
 
-  updateReservationStatus(resId, status) {
+  async updateReservationStatus(resId, status) {
+    const { error } = await supabase.from('reservations').update({ status }).eq('id', resId);
+    if (error) throw error;
+    const res = this.state.reservations.find(r => r.id === resId);
+    if (res) {
+      const item = this.state.equipment.find(eq => eq.id === res.equipmentId);
+      await this.syncEquipmentStatus(res.equipmentId);
+      const labels = { approved: 'a approuvé la réservation pour', rejected: 'a rejeté la réservation pour', cancelled: 'a annulé la réservation pour' };
+      if (labels[status]) await this.addActivity(labels[status], item?.name || 'un matériel');
+    }
+    await this.refreshAll();
+  }
+
+  async prolongReservation(resId) {
+    const { error } = await supabase.from('reservations')
+      .update({ prolongation_requested: true }).eq('id', resId);
+    if (error) throw error;
+    const res = this.state.reservations.find(r => r.id === resId);
+    const item = this.state.equipment.find(eq => eq.id === res?.equipmentId);
+    await this.addActivity('a demandé une prolongation pour', item?.name || 'un matériel');
+    await this.refreshAll();
+  }
+
+  async approveProlongation(resId) {
     const res = this.state.reservations.find(r => r.id === resId);
     if (!res) return;
-
-    res.status = status;
-    this.saveReservations();
-
+    const newEnd = new Date(res.endDate);
+    newEnd.setDate(newEnd.getDate() + 1);
+    const newEndStr = newEnd.toISOString().split('T')[0];
+    const { error } = await supabase.from('reservations')
+      .update({ end_date: newEndStr, prolongation_requested: false }).eq('id', resId);
+    if (error) throw error;
     const item = this.state.equipment.find(eq => eq.id === res.equipmentId);
-    
-    if (status === 'approved') {
-      this.updateEquipmentStatus(res.equipmentId);
-      this.addActivity("a approuvé la réservation pour", item ? item.name : "un matériel");
-    } else if (status === 'rejected') {
-      this.updateEquipmentStatus(res.equipmentId);
-      this.addActivity("a rejeté la réservation pour", item ? item.name : "un matériel");
-    } else if (status === 'cancelled') {
-      this.updateEquipmentStatus(res.equipmentId);
-      this.addActivity("a annulé la réservation pour", item ? item.name : "un matériel");
-    }
+    await this.addActivity('a approuvé la prolongation pour', item?.name || 'un matériel');
+    await this.refreshAll();
   }
 
-  prolongReservation(resId) {
-    const res = this.state.reservations.find(r => r.id === resId);
-    if (!res) return;
-
-    // Send a notification/request to administrator by adding an activity
-    const item = this.state.equipment.find(eq => eq.id === res.equipmentId);
-    this.addActivity("a demandé une prolongation pour", item ? item.name : "un matériel");
-    
-    // Just simple flag for demo
-    res.prolongationRequested = true;
-    this.saveReservations();
-  }
-
-  // Helper to dynamically calculate equipment status based on approved bookings on current day
-  updateEquipmentStatus(equipmentId) {
-    const todayStr = new Date().toISOString().split('T')[0];
+  async syncEquipmentStatus(equipmentId) {
     const item = this.state.equipment.find(eq => eq.id === equipmentId);
-    if (!item) return;
-
-    // If item is outoforder or maintenance, preserve it unless admin changed it
-    if (item.status === 'outoforder' || item.status === 'maintenance') {
-      return;
-    }
-
-    // Check if there is an approved reservation right now
-    const hasApprovedToday = this.state.reservations.some(res => 
-      res.equipmentId === equipmentId &&
-      res.status === 'approved' &&
-      todayStr >= res.startDate &&
-      todayStr <= res.endDate
+    if (!item || item.status === 'outoforder' || item.status === 'maintenance') return;
+    const today = new Date().toISOString().split('T')[0];
+    const isReservedToday = this.state.reservations.some(res =>
+      res.equipmentId === equipmentId && res.status === 'approved' &&
+      today >= res.startDate && today <= res.endDate
     );
-
-    const newStatus = hasApprovedToday ? 'reserved' : 'available';
+    const newStatus = isReservedToday ? 'reserved' : 'available';
     if (item.status !== newStatus) {
-      item.status = newStatus;
-      this.saveEquipment();
+      await supabase.from('equipment').update({ status: newStatus }).eq('id', equipmentId);
     }
   }
 
-  updateAllEquipmentStatus() {
-    this.state.equipment.forEach(eq => {
-      this.updateEquipmentStatus(eq.id);
-    });
-  }
-
-  // --- Activities ---
-  getActivities() {
-    return this.state.activities;
-  }
-
-  addActivity(action, itemName) {
-    const newAct = {
-      id: `act-${Date.now()}`,
-      userName: this.state.currentUser ? this.state.currentUser.name : "Système",
-      action,
-      itemName,
-      time: "À l'instant"
-    };
-    this.state.activities.unshift(newAct);
-    // Keep last 15 activities
-    if (this.state.activities.length > 15) {
-      this.state.activities.pop();
-    }
-    this.saveActivities();
+  // --------------------------------------------------------
+  // ACTIVITIES
+  // --------------------------------------------------------
+  async addActivity(action, itemName) {
+    const userName = this.state.currentUser?.name || 'Système';
+    await supabase.from('activities').insert({ user_name: userName, action, item_name: itemName });
   }
 }
 
 const store = new EduBookStore();
-// Perform initial update of statuses
-store.updateAllEquipmentStatus();
-
 export default store;
