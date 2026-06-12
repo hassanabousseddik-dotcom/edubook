@@ -44,6 +44,10 @@ export function renderNavbar() {
             <i data-lucide="user" style="width:18px;height:18px;"></i>
             Profil
           </a>
+          <button id="mobile-logout-btn" class="nav-link mobile-only" style="color:var(--danger);width:100%;text-align:left;border:none;background:none;cursor:pointer;padding:8px 16px;">
+            <i data-lucide="log-out" style="width:18px;height:18px;"></i>
+            Se déconnecter
+          </button>
         </div>
 
         <div class="nav-actions">
@@ -60,7 +64,7 @@ export function renderNavbar() {
 
             <!-- Dropdown -->
             <div class="user-dropdown-menu glass-card" id="user-dropdown"
-              style="display:none;position:absolute;top:60px;right:80px;width:220px;z-index:1001;padding:12px;flex-direction:column;gap:8px;">
+              style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;z-index:1001;padding:12px;flex-direction:column;gap:8px;">
               <div style="padding:8px 4px;border-bottom:1px solid var(--border-color);margin-bottom:4px;">
                 <p style="font-size:0.8rem;font-weight:600;color:var(--text-main);">${currentUser?.name}</p>
                 <p style="font-size:0.72rem;color:var(--text-muted);">${currentUser?.email || ''}</p>
@@ -134,14 +138,16 @@ export function initNavbar() {
   }, { capture: false });
 
   // Déconnexion
-  container.querySelector('#logout-btn')?.addEventListener('click', async () => {
+  const handleLogout = async () => {
     try {
       await signOut();
-      // app.js écoute le changement d'état auth et affiche le login
     } catch (err) {
       console.error('Erreur déconnexion:', err);
     }
-  });
+  };
+
+  container.querySelector('#logout-btn')?.addEventListener('click', handleLogout);
+  container.querySelector('#mobile-logout-btn')?.addEventListener('click', handleLogout);
 
   // Mobile toggle
   const mobileToggle = container.querySelector('#mobile-toggle');

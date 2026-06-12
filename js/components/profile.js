@@ -1,5 +1,6 @@
 // EduBook Profile Component
 import store from '../store.js';
+import { signOut } from '../auth.js';
 
 export function renderProfile(container) {
   const currentUser = store.getCurrentUser();
@@ -61,6 +62,11 @@ export function renderProfile(container) {
         <span class="user-badge ${currentUser.role === 'admin' ? 'admin' : 'teacher'}" style="padding: 6px 16px; font-size: 0.8rem; margin-bottom: 24px;">
           ${currentUser.role === 'admin' ? 'Administrateur' : 'Enseignant'}
         </span>
+
+        <button id="profile-logout-btn" class="btn btn-danger" style="width: 100%; margin-bottom: 24px; gap: 8px;">
+          <i data-lucide="log-out" style="width:16px;height:16px;"></i>
+          Se déconnecter
+        </button>
 
         <!-- Stats grid inside profile card -->
         <div style="width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 24px;">
@@ -163,6 +169,15 @@ export function renderProfile(container) {
       // Re-render profile page
       renderProfile(container);
     });
+  });
+
+  // Bind Logout button
+  container.querySelector('#profile-logout-btn')?.addEventListener('click', async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error('Erreur de déconnexion:', err);
+    }
   });
 
   if (window.lucide) window.lucide.createIcons();

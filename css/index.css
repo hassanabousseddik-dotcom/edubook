@@ -307,6 +307,7 @@ button {
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
+  position: relative;
   transition: all var(--transition-fast);
 }
 
@@ -1055,10 +1056,18 @@ textarea.form-control {
   margin-bottom: 20px;
 }
 
+.mobile-only {
+  display: none !important;
+}
+
 /* ----------------------------------------------------
    Responsive & Mobile Adjustments
    ---------------------------------------------------- */
 @media (max-width: 768px) {
+  .mobile-only {
+    display: flex !important;
+  }
+
   .navbar-inner {
     padding: 0 16px;
   }
