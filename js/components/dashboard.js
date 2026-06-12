@@ -197,21 +197,22 @@ export function renderDashboard(container) {
         </h3>
         <div class="recent-activity-list">
           ${activities.slice(0, 4).map(activity => {
-            let avatarLetter = activity.userName.charAt(0);
-            if (activity.userName.startsWith("Mme.")) avatarLetter = "M";
-            if (activity.userName.startsWith("M.")) avatarLetter = "M";
-            if (activity.userName === "Admin") avatarLetter = "A";
+            const userName = activity.userName || 'Système';
+            let avatarLetter = userName.charAt(0) || 'S';
+            if (userName.startsWith("Mme.")) avatarLetter = "M";
+            if (userName.startsWith("M.")) avatarLetter = "M";
+            if (userName === "Admin") avatarLetter = "A";
 
             return `
               <div class="activity-item">
-                <div class="activity-avatar" style="flex-shrink: 0; background: ${activity.userName === 'Admin' ? 'var(--secondary-glow)' : 'var(--primary-glow)'}; color: ${activity.userName === 'Admin' ? 'var(--secondary)' : 'var(--primary)'}; border: 1px solid var(--border-color);">
+                <div class="activity-avatar" style="flex-shrink: 0; background: ${userName === 'Admin' ? 'var(--secondary-glow)' : 'var(--primary-glow)'}; color: ${userName === 'Admin' ? 'var(--secondary)' : 'var(--primary)'}; border: 1px solid var(--border-color);">
                   ${avatarLetter}
                 </div>
                 <div class="activity-details">
                   <div class="activity-text">
-                    <strong style="color: var(--text-main); font-weight: 600;">${activity.userName}</strong> 
+                    <strong style="color: var(--text-main); font-weight: 600;">${userName}</strong> 
                     <span style="color: var(--text-muted);">${activity.action}</span> 
-                    <span style="color: var(--primary); font-weight: 500;">${activity.itemName}</span>
+                    <span style="color: var(--primary); font-weight: 500;">${activity.itemName || ''}</span>
                   </div>
                   <div class="activity-time">${activity.time}</div>
                 </div>

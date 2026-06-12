@@ -65,7 +65,12 @@ class EduBookStore {
   }
 
   mapActivity(act) {
-    return { ...act, time: formatRelativeTime(act.created_at) };
+    return {
+      ...act,
+      userName: act.user_name,
+      itemName: act.item_name,
+      time: formatRelativeTime(act.created_at)
+    };
   }
 
   // --------------------------------------------------------
