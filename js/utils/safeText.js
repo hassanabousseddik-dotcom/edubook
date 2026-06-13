@@ -1,21 +1,19 @@
 export function safeText(value, fallback = "Utilisateur") {
-  const text = String(value || "").trim()
+  const text = String(value ?? "").trim()
   return text || fallback
 }
 
-export function getSafeInitial(value, fallback = "U") {
+export function safeInitial(value, fallback = "U") {
   return safeText(value, fallback).charAt(0).toUpperCase()
 }
 
 export function getSafeAvatar(profile) {
-  return safeText(
+  return safeInitial(
     profile?.avatar ||
     profile?.name ||
     profile?.email,
     "U"
   )
-    .charAt(0)
-    .toUpperCase()
 }
 
 export function getSafeUserName(profile, fallback = "Utilisateur") {

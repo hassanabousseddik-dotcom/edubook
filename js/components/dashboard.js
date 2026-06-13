@@ -1,18 +1,12 @@
 // EduBook Dashboard Component
 import store from '../store.js';
-import { getSafeInitial } from '../utils/safeText.js';
+import { safeText, safeInitial } from '../utils/safeText.js';
 
 export function renderDashboard(container) {
   const equipment = store.getEquipment() || [];
   const reservations = store.getReservations() || [];
   const activities = store.getActivities() || [];
-  const currentUser = store.getCurrentUser() || {
-    id: '',
-    name: 'Utilisateur',
-    email: '',
-    avatar: 'U',
-    role: 'teacher'
-  };
+  const currentUser = store.getCurrentUser();
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -69,7 +63,7 @@ export function renderDashboard(container) {
     <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 16px;">
       <div>
         <h1 class="dashboard-title" style="margin-bottom: 4px;">Tableau de Bord</h1>
-        <p style="color: var(--text-muted); font-size: 0.95rem;">Ravi de vous revoir, <strong style="color: var(--text-main);">${currentUser.name}</strong>. Voici l'état du matériel de l'établissement.</p>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Ravi de vous revoir, <strong style="color: var(--text-main);">${safeText(currentUser?.name)}</strong>. Voici l'état du matériel de l'établissement.</p>
       </div>
       <a href="#catalog" class="btn btn-primary">
         <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i>
@@ -205,8 +199,8 @@ export function renderDashboard(container) {
         <div class="recent-activity-list">
           ${activities.slice(0, 4).map(activity => {
             if (!activity) return '';
-            const userName = activity.userName || 'Système';
-            let avatarLetter = getSafeInitial(userName, 'S');
+            const userName = safeText(activity?.userName, 'Système');
+            let avatarLetter = safeInitial(activity?.userName, 'S');
             if (userName.startsWith("Mme.")) avatarLetter = "M";
             if (userName.startsWith("M.")) avatarLetter = "M";
             if (userName === "Admin") avatarLetter = "A";
@@ -220,7 +214,7 @@ export function renderDashboard(container) {
                   <div class="activity-text">
                     <strong style="color: var(--text-main); font-weight: 600;">${userName}</strong> 
                     <span style="color: var(--text-muted);">${activity.action || 'a effectué une action'}</span> 
-                    <span style="color: var(--primary); font-weight: 500;">${activity.itemName || 'un matériel'}</span>
+                    <span style="color: var(--primary); font-weight: 500;">${safeText(activity?.itemName, 'Matériel inconnu')}</span>
                   </div>
                   <div class="activity-time">${activity.time || '—'}</div>
                 </div>
@@ -265,13 +259,13 @@ export function renderDashboard(container) {
 
               return `
                 <tr>
-                  <td style="font-family: monospace; font-size: 0.85rem; font-weight: 600; color: var(--primary);">${eq.ref}</td>
+                  <td style="font-family: monospace; font-size: 0.85rem; font-weight: 600; color: var(--primary);">${eq.ref || 'N/A'}</td>
                   <td style="font-weight: 600; display: flex; align-items: center; gap: 12px;">
-                    <img src="${eq.imageUrl}" alt="${eq.name}" style="width: 36px; height: 36px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-color);" />
-                    <span>${eq.name}</span>
+                    <img src="${eq.imageUrl || ''}" alt="${safeText(eq?.name, 'Matériel')}" style="width: 36px; height: 36px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-color);" />
+                    <span>${safeText(eq?.name, 'Matériel inconnu')}</span>
                   </td>
-                  <td>${eq.category}</td>
-                  <td style="font-weight: 700; color: var(--text-main);">${eq.bookings} fois</td>
+                  <td>${eq.category || 'Général'}</td>
+                  <td style="font-weight: 700; color: var(--text-main);">${eq.bookings || 0} fois</td>
                   <td>
                     <span class="badge ${badgeClass}">
                       <span class="badge-dot"></span>
