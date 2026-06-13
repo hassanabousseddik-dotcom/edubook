@@ -1,4 +1,12 @@
 // EduBook — Point d'entrée principal (SPA avec auth Supabase)
+window.addEventListener("error", (event) => {
+  console.error("GLOBAL ERROR:", event.error);
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  console.error("PROMISE ERROR:", event.reason);
+});
+
 import { getCurrentSession, onAuthStateChange } from './auth.js';
 import { renderLogin, initLogin } from './components/login.js';
 import { renderNavbar, initNavbar } from './components/navbar.js';

@@ -34,6 +34,9 @@ class EduBookStore {
           user.email?.split("@")[0] ||
           "Utilisateur";
 
+        console.error("DEBUG charAt value (initialize):", fallbackName);
+        console.trace();
+
         const defaultProfile = {
           id: user.id,
           name: fallbackName,

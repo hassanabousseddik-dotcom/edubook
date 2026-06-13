@@ -4,16 +4,22 @@ export function safeText(value, fallback = "Utilisateur") {
 }
 
 export function safeInitial(value, fallback = "U") {
-  return safeText(value, fallback).charAt(0).toUpperCase()
+  const resolvedValue = safeText(value, fallback);
+  console.error("DEBUG charAt value (safeInitial):", resolvedValue);
+  console.trace();
+  return resolvedValue.charAt(0).toUpperCase()
 }
 
 export function getSafeAvatar(profile) {
-  return safeInitial(
+  const resolvedValue = safeText(
     profile?.avatar ||
     profile?.name ||
     profile?.email,
     "U"
-  )
+  );
+  console.error("DEBUG charAt value (getSafeAvatar):", resolvedValue);
+  console.trace();
+  return resolvedValue.charAt(0).toUpperCase()
 }
 
 export function getSafeUserName(profile, fallback = "Utilisateur") {

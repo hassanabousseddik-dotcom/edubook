@@ -51,6 +51,7 @@ export function initRouter() {
           <i data-lucide="alert-triangle" style="width:48px;height:48px;color:var(--danger);margin-bottom:16px;"></i>
           <h2>Erreur lors du chargement</h2>
           <p style="color:var(--text-muted);margin-top:10px;">${err.message}</p>
+          <pre style="text-align:left;background:rgba(0,0,0,0.3);padding:15px;border-radius:var(--radius-sm);margin-top:15px;font-size:0.8rem;overflow-x:auto;color:var(--danger);max-height:200px;font-family:monospace;">${err.stack || ''}</pre>
           <button class="btn btn-primary" style="margin-top:20px;"
             onclick="window.location.hash='#dashboard'">Retour au Tableau de Bord</button>
         </div>

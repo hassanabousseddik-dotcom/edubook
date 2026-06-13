@@ -7,6 +7,13 @@ export function renderDashboard(container) {
   const reservations = store.getReservations() || [];
   const activities = store.getActivities() || [];
   const currentUser = store.getCurrentUser();
+  const profile = currentUser;
+
+  console.log("Current User:", currentUser);
+  console.log("Profile:", profile);
+  console.log("Activities:", activities);
+  console.log("Equipment:", equipment);
+  console.log("Reservations:", reservations);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
