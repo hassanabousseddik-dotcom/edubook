@@ -13,6 +13,33 @@
   
   <!-- Stylesheets -->
   <link rel="stylesheet" href="/css/index.css">
+
+  <!-- HTML5 Importmap to bypass module caching aggressively -->
+  <script type="importmap">
+    {
+      "imports": {
+        "./auth.js": "/js/auth.js?v=4",
+        "./components/login.js": "/js/components/login.js?v=4",
+        "./components/navbar.js": "/js/components/navbar.js?v=4",
+        "./router.js": "/js/router.js?v=4",
+        "./store.js": "/js/store.js?v=4",
+        "./supabase.js": "/js/supabase.js?v=4",
+        "./utils/toast.js": "/js/utils/toast.js?v=4",
+        "./components/dashboard.js": "/js/components/dashboard.js?v=4",
+        "./components/catalog.js": "/js/components/catalog.js?v=4",
+        "./components/reservations.js": "/js/components/reservations.js?v=4",
+        "./components/adminPanel.js": "/js/components/adminPanel.js?v=4",
+        "./components/profile.js": "/js/components/profile.js?v=4",
+        "./utils/time.js": "/js/utils/time.js?v=4",
+        "../store.js": "/js/store.js?v=4",
+        "../utils/toast.js": "/js/utils/toast.js?v=4",
+        "./bookingForm.js": "/js/components/bookingForm.js?v=4",
+        "../utils/safeText.js": "/js/utils/safeText.js?v=4",
+        "../auth.js": "/js/auth.js?v=4",
+        "./navbar.js": "/js/components/navbar.js?v=4"
+      }
+    }
+  </script>
 </head>
 <body>
 
@@ -32,6 +59,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   
   <!-- Entry script (modern modular JS) -->
-  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/app.js?v=4"></script>
 </body>
 </html>
